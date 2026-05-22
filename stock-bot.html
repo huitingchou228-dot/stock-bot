@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能選股機器人 | Stock Picker</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; }
+  body { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); min-height: 100vh; padding: 20px; color: #333; }
+  .container { max-width: 1200px; margin: 0 auto; }
+  .header { text-align: center; color: white; margin-bottom: 30px; }
+  .header h1 { font-size: 2.4rem; margin-bottom: 8px; font-weight: 700; }
+  .header p { opacity: 0.9; font-size: 1rem; }
+  .header .badge { display: inline-block; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-top: 10px; }
+  .card { background: white; border-radius: 14px; padding: 28px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); margin-bottom: 20px; }
+  .card h2 { font-size: 1.25rem; margin-bottom: 18px; color: #1e3c72; border-left: 4px solid #2a5298; padding-left: 12px; }
+  .data-source { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .source-option { border: 2px dashed #cbd5e1; border-radius: 10px; padding: 22px; text-align: center; cursor: pointer; transition: all 0.2s; }
+  .source-option:hover { border-color: #2a5298; background: #f0f7ff; }
+  .source-option.active { border-color: #2a5298; background: #e6f0ff; border-style: solid; }
+  .source-option .icon { font-size: 2rem; margin-bottom: 8px; }
+  .source-option .title { font-weight: 600; color: #1e3c72; }
+  .source-option .desc { font-size: 0.85rem; color: #64748b; margin-top: 4px; }
+  .filter-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .filter-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; }
+  .filter-item label { display: block; font-size: 0.85rem; color: #64748b; margin-bottom: 6px; font-weight: 500; }
+  .filter-item input { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; }
+  .filter-item .hint { font-size: 0.75rem; color: #94a3b8; margin-top: 4px; }
+  .indicator-table { width: 100%; border-collapse: collapse; }
+  .indicator-table th { background: #1e3c72; color: white; padding: 10px 12px; text-align: left; font-size: 0.85rem; font-weight: 600; }
+  .indicator-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 0.88rem; }
+  .indicator-name { font-weight: 600; color: #1e3c72; }
+  .weight-input { width: 60px; padding: 4px 6px; border: 1px solid #cbd5e1; border-radius: 4px; text-align: center; }
+  .score-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 600; margin-right: 4px; margin-bottom: 3px; }
+  .score-pos { background: #dcfce7; color: #166534; }
+  .score-neg { background: #fee2e2; color: #991b1b; }
+  .score-mid { background: #fef3c7; color: #92400e; }
+  .action-row { display: flex; gap: 12px; justify-content: center; margin: 24px 0; }
+  .btn { padding: 14px 32px; border-radius: 10px; border: none; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .btn-primary { background: linear-gradient(135deg, #2a5298, #1e3c72); color: white; }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(42,82,152,0.4); }
+  .btn-secondary { background: #e2e8f0; color: #475569; }
+  .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+  .result-header h2 { border: none; padding: 0; margin: 0; }
+  .result-meta { font-size: 0.85rem; color: #64748b; }
+  .stock-list { display: grid; gap: 10px; }
+  .stock-item { display: grid; grid-template-columns: 50px 1fr 1fr 1fr 1fr 80px; gap: 12px; align-items: center; padding: 14px; background: #f8fafc; border-radius: 8px; border-left: 4px solid #2a5298; }
+  .stock-item:nth-child(1) { border-left-color: #f59e0b; background: #fffbeb; }
+  .stock-item:nth-child(2) { border-left-color: #94a3b8; }
+  .stock-item:nth-child(3) { border-left-color: #b45309; background: #fef3c7; }
+  .rank { font-size: 1.4rem; font-weight: 700; color: #1e3c72; text-align: center; }
+  .stock-code { font-weight: 700; color: #1e3c72; font-size: 1rem; }
+  .stock-name { font-size: 0.85rem; color: #64748b; }
+  .stock-metric { font-size: 0.85rem; }
+  .stock-metric .label { color: #94a3b8; font-size: 0.75rem; display: block; }
+  .stock-metric .value { color: #1e3c72; font-weight: 600; }
+  .price-up { color: #dc2626 !important; }
+  .total-score { background: #1e3c72; color: white; padding: 6px 10px; border-radius: 20px; font-weight: 700; text-align: center; font-size: 0.95rem; }
+  .footer { text-align: center; color: rgba(255,255,255,0.7); font-size: 0.85rem; margin-top: 30px; }
+  @media (max-width: 768px) {
+    .filter-grid { grid-template-columns: 1fr; }
+    .data-source { grid-template-columns: 1fr; }
+    .stock-item { grid-template-columns: 40px 1fr 1fr 70px; gap: 8px; }
+    .stock-item .hide-mobile { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>📈 智能選股機器人</h1>
+    <p>雙層篩選機制 × 多因子技術分析 × 評分總和制</p>
+    <span class="badge">經濟一 · 周暉庭 · B14303140</span>
+  </div>
+
+  <div class="card">
+    <h2>① 資料來源</h2>
+    <div class="data-source">
+      <div class="source-option active">
+        <div class="icon">🔄</div>
+        <div class="title">FinMind API 即時抓取</div>
+        <div class="desc">自動拉取當日盤後資料</div>
+      </div>
+      <div class="source-option">
+        <div class="icon">📁</div>
+        <div class="title">上傳 CSV 檔案</div>
+        <div class="desc">手動上傳本地資料檔</div>
+      </div>
+    </div>
+    <div style="margin-top: 14px; padding: 12px; background: #f0f7ff; border-radius: 8px; font-size: 0.85rem; color: #475569;">
+      📅 最後更新：2026/05/22 18:03　|　📊 共載入 1,847 檔個股
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>② 第一層：硬性篩選</h2>
+    <div class="filter-grid">
+      <div class="filter-item">
+        <label>EPS 最低值</label>
+        <input type="number" value="0" step="0.1">
+        <div class="hint">排除虧損公司</div>
+      </div>
+      <div class="filter-item">
+        <label>成交量門檻（張）</label>
+        <input type="number" value="1000">
+        <div class="hint">避免流動性風險</div>
+      </div>
+      <div class="filter-item">
+        <label>最低股價</label>
+        <input type="number" value="20">
+        <div class="hint">排除水餃股</div>
+      </div>
+      <div class="filter-item" style="grid-column: span 3;">
+        <label>
+          <input type="checkbox" checked style="width: auto; margin-right: 6px;">
+          股價需在季線（MA60）之上
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>③ 第二層：多因子技術指標（權重可調）</h2>
+    <table class="indicator-table">
+      <thead>
+        <tr>
+          <th style="width: 120px;">指標</th>
+          <th style="width: 80px;">權重</th>
+          <th>評分規則</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="indicator-name">KD</td>
+          <td><input type="number" class="weight-input" value="1.0" step="0.1"></td>
+          <td>
+            <span class="score-badge score-pos">K&gt;D 20~50: +4</span>
+            <span class="score-badge score-pos">K&gt;D 50~80: +2</span>
+            <span class="score-badge score-neg">K&gt;D &gt;80: -1</span>
+            <span class="score-badge score-neg">K&lt;D: -4</span>
+          </td>
+        </tr>
+        <tr>
+          <td class="indicator-name">MACD</td>
+          <td><input type="number" class="weight-input" value="1.3" step="0.1"></td>
+          <td>
+            <span class="score-badge score-pos">翻紅+黃金交叉: +5</span>
+            <span class="score-badge score-pos">柱狀增加: +3</span>
+            <span class="score-badge score-mid">動能減弱: +1</span>
+            <span class="score-badge score-neg">DIF&lt;MACD: -4</span>
+          </td>
+        </tr>
+        <tr>
+          <td class="indicator-name">BIAS 乖離率</td>
+          <td><input type="number" class="weight-input" value="2.0" step="0.1"></td>
+          <td>
+            <span class="score-badge score-pos">3%~8%: +6</span>
+            <span class="score-badge score-pos">0%~3%: +3</span>
+            <span class="score-badge score-mid">8%~12%: 0</span>
+            <span class="score-badge score-neg">過度偏離: -6</span>
+          </td>
+        </tr>
+        <tr>
+          <td class="indicator-name">相對成交量</td>
+          <td><input type="number" class="weight-input" value="2.2" step="0.1"></td>
+          <td>
+            <span class="score-badge score-pos">&gt;2.0: +6</span>
+            <span class="score-badge score-pos">1.5~2.0: +4</span>
+            <span class="score-badge score-mid">1.0~1.5: +1</span>
+            <span class="score-badge score-neg">&lt;0.8: -5</span>
+          </td>
+        </tr>
+        <tr>
+          <td class="indicator-name">買盤強度</td>
+          <td><input type="number" class="weight-input" value="1.8" step="0.1"></td>
+          <td>
+            <span class="score-badge score-pos">&gt;1.5: +5</span>
+            <span class="score-badge score-pos">1.2~1.5: +3</span>
+            <span class="score-badge score-mid">0.8~1.2: 0</span>
+            <span class="score-badge score-neg">&lt;0.8: -5</span>
+          </td>
+        </tr>
+        <tr>
+          <td class="indicator-name">BOLL Z-Score</td>
+          <td><input type="number" class="weight-input" value="1.5" step="0.1"></td>
+          <td>
+            <span class="score-badge score-pos">0.5~1.5: +5</span>
+            <span class="score-badge score-pos">0~0.5: +2</span>
+            <span class="score-badge score-neg">1.5~2: -1</span>
+            <span class="score-badge score-neg">過度偏離: -5</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="margin-top: 14px; display: flex; gap: 14px; align-items: center;">
+      <label style="font-size: 0.9rem;">取前 N 名：</label>
+      <input type="number" value="10" min="1" max="50" style="width: 80px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+    </div>
+  </div>
+
+  <div class="action-row">
+    <button class="btn btn-secondary">重設參數</button>
+    <button class="btn btn-primary">🚀 開始選股</button>
+  </div>
+
+  <div class="card">
+    <div class="result-header">
+      <h2>📊 選股結果（Top 5 預覽）</h2>
+      <div class="result-meta">執行時間 1.2 秒 · 通過第一層 312 檔</div>
+    </div>
+    <div class="stock-list">
+      <div class="stock-item">
+        <div class="rank">1</div>
+        <div>
+          <div class="stock-code">2330</div>
+          <div class="stock-name">台積電</div>
+        </div>
+        <div class="stock-metric">
+          <span class="label">收盤</span>
+          <span class="value price-up">1,125 ▲2.1%</span>
+        </div>
+        <div class="stock-metric hide-mobile">
+          <span class="label">成交量</span>
+          <span class="value">42,318 張</span>
+        </div>
+        <div class="stock-metric hide-mobile">
+          <span class="label">BIAS</span>
+          <span class="value">+5.2%</span>
+        </div>
+        <div class="total-score">28.6</div>
+      </div>
+      <div class="stock-item">
+        <div class="rank">2</div>
+        <div>
+          <div class="stock-code">2454</div>
+          <div class="stock-name">聯發科</div>
+        </div>
+        <div class="stock-metric">
+          <span class="label">收盤</span>
+          <span class="value price-up">1,420 ▲1.4%</span>
+        </div>
+        <div class="stock-metric hide-mobile">
+          <span class="label">成交量</span>
+          <span class="value">8,217 張</span>
+        </div>
+        <div class="stock-metric hide-mobile">
+          <span class="label">BIAS</span>
+          <span class="value">+4.1%</span>
+        </div>
+        <div class="total-score">25.3</div>
+      </div>
+      <div class="stock-item">
+        <div class="rank">3</div>
+        <div>
+          <div class="stock-code">3008</div>
+          <div class="stock-name">大立光</div>
+        </div>
+        <div class="stock-metric">
+          <span class="label">收盤</span>
+          <span class="value price-up">2,485 ▲0.8%</span>
+        </div>
+        <div class="stock-metric hide-mobile">
+          <span class="label">成交量</span>
+          <span class="value">1,842 張</span>
+        </div>
+        <div class="stock-metric hide-mobile">
+          <span class="label">BIAS</span>
+          <span class="value">+3.7%</span>
+        </div>
+        <div class="total-score">22.8</div>
+      </div>
+      <div class="stock-item">
+        <div class="rank">4</div>
+        <div>
+          <div class="stock-code">2317</div>
+          <div class="stock-name">鴻海</div>
+        </div>
+        <div class="stock-metric">
+          <span class="label">收盤</span>
+          <span class="value price-up">218.5 ▲1.9%</span>
+        </div>
+        <div class="stock-metric hide-mobile">
+          <span class="label">成交量</span>
+          <span class="value">38,521 張</span>
+        </div>
+        <div class="stock-metric hide-mobile">
+          <span class="label">BIAS</span>
+          <span class="value">+6.3%</span>
+        </div>
+        <div class="total-score">21.4</div>
+      </div>
+      <div class="stock-item">
+        <div class="rank">5</div>
+        <div>
+          <div class="stock-code">2382</div>
+          <div class="stock-name">廣達</div>
+        </div>
+        <div class="stock-metric">
+          <span class="label">收盤</span>
+          <span class="value price-up">312 ▲1.2%</span>
+        </div>
+        <div class="stock-metric hide-mobile">
+          <span class="label">成交量</span>
+          <span class="value">12,094 張</span>
+        </div>
+        <div class="stock-metric hide-mobile">
+          <span class="label">BIAS</span>
+          <span class="value">+4.8%</span>
+        </div>
+        <div class="total-score">19.7</div>
+      </div>
+    </div>
+    <div style="text-align: center; margin-top: 14px; font-size: 0.8rem; color: #94a3b8;">
+      ⚠️ 本工具僅為學術研究用途，不構成任何投資建議
+    </div>
+  </div>
+
+  <div class="footer">
+    Stock Picker v1.0 · Powered by FinMind API · 程式設計專題作品
+  </div>
+</div>
+</body>
+</html>
